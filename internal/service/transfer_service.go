@@ -58,6 +58,7 @@ func (s *TransferService) ExecuteTransfer(ctx context.Context, req dto.TransferR
 		firstLockID, secondLockID = req.FromAccountID, req.ToAccountID
 	}
 	accMap := make(map[int]*entity.Account)
+	
 	firstAccount, err := s.repo.GetAccountForUpdate(ctx, tx, firstLockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lock account %d: %w", firstLockID, err)
