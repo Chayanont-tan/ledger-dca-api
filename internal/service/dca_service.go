@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"time"
 
 	"ledger-dca-engine/internal/dto"
@@ -57,13 +59,32 @@ func (s *dcaService) CreatePlan(ctx context.Context, req dto.CreateDCAPlanReques
 }
 
 func (s *dcaService) ProcessDuePlans(ctx context.Context) error {
-	// plans, err := s.dcaRepo.GetDuePlans(ctx , 10)
-	// if err != nil {
-	// 	return err
-	// }
-	// for _,plan := range(plans) {
+	plans, err := s.dcaRepo.GetDuePlans(ctx, 10)
+	if err != nil {
+		return err
+	}
+	for _, plan := range plans {
+		idempotencyKey := fmt.Sprintf("dca-%d-%d", plan.ID, plan.NextRunAt.Unix())
 
-	// }
-	// idempotencyKey := fmt.Sprintf("dca-%d-%d", plan.ID, plan.NextRunAt.Unix())
+		transferReq := dto.TransferRequest{
+			IdempotencyKey: idempotencyKey,
+			FromAccountID:  plan.SourceAccountID,
+			ToAccountID:    plan.TargetAccountID,
+			Amount:         plan.Amount,
+			Description:    fmt.Sprintf("DCA Execution for Plan #%d", plan.ID),
+		}
+
+		res, err := s.transferService.ExecuteTransfer(ctx, transferReq)
+		if err != nil {
+			log.Printf("⚠️ [DCA] Plan #%d failed: %v", plan.ID, err)
+		} else {
+			log.Printf("✅ [DCA] Plan #%d executed successfully (TxID: %s)", plan.ID, res.TransactionID)
+		}
+		nextRun := time.Now().Add(time.Duration(plan.IntervalSeconds) * time.Second)
+		if updateErr := s.dcaRepo.UpdatePlanNextRun(ctx, plan.ID, nextRun); err != nil {
+			log.Printf("❌ [DCA] Failed to update next run for Plan #%d: %v", plan.ID, updateErr)
+		}
+	}
+
 	return nil
 }
