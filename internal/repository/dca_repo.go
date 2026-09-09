@@ -62,3 +62,48 @@ func (r *dcaRepository) UpdatePlanNextRun(ctx context.Context, planID int, nextR
 	}
 	return nil
 }
+
+func (r *dcaRepository) UpdatePlanFailed(ctx context.Context, plan *entity.DCAPlan) error {
+	query := `
+        UPDATE dca_plans 
+        SET retry_count = $1,
+            next_run_at = $2,
+            last_error = $3,
+            status = CASE
+                        WHEN $1 >= max_retries THEN 'FAILED'
+                        ELSE 'ACTIVE'
+                     END,
+            updated_at = NOW()
+        WHERE id = $4
+    `
+	_, err := r.db.ExecContext(ctx, query, plan.RetryCount, plan.NextRunAt, plan.LastError, plan.ID)
+	return err
+}
+
+func (r *dcaRepository) UpdatePlanPaused(ctx context.Context, plan *entity.DCAPlan) error {
+	query := `
+		UPDATE dca_plans 
+		SET retry_count = $1, 
+		    next_run_at = $2, 
+		    status = 'PAUSED',
+		    updated_at = NOW() 
+		WHERE id = $3
+	`
+	_, err := r.db.ExecContext(ctx, query, plan.RetryCount, plan.NextRunAt, plan.ID)
+	return err
+}
+
+func (r *dcaRepository) UpdatePlanSuccess(ctx context.Context, plan *entity.DCAPlan) error {
+
+	query := `
+        UPDATE dca_plans 
+        SET next_run_at = $1, 
+            retry_count = 0, 
+            last_error = NULL, 
+            status = 'ACTIVE',
+            updated_at = NOW()
+        WHERE id = $2
+    `
+	_, err := r.db.ExecContext(ctx, query, plan.NextRunAt, plan.ID)
+	return err
+}

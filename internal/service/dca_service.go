@@ -25,7 +25,7 @@ func NewDCAService(dcaRepo interfaces.DCARepository, transferService interfaces.
 }
 
 func (s *dcaService) CreatePlan(ctx context.Context, req dto.CreateDCAPlanRequest) (*dto.DCAPlanResponse, error) {
-	// validate input
+
 	if req.Amount <= 0 {
 		return nil, errors.New("amount must be greater than zero")
 	}
@@ -76,13 +76,20 @@ func (s *dcaService) ProcessDuePlans(ctx context.Context) error {
 
 		res, err := s.transferService.ExecuteTransfer(ctx, transferReq)
 		if err != nil {
-			log.Printf("⚠️ [DCA] Plan #%d failed: %v", plan.ID, err)
-		} else {
-			log.Printf("✅ [DCA] Plan #%d executed successfully (TxID: %s)", plan.ID, res.TransactionID)
+			plan.RetryCount++
+			plan.NextRunAt = time.Now().Add(15 * time.Second)
+			plan.LastError = err.Error()
+
+			if updateErr := s.dcaRepo.UpdatePlanFailed(ctx, plan); updateErr != nil {
+				log.Printf("failed to update plan status: %v", updateErr)
+			}
+			continue 
 		}
-		nextRun := time.Now().Add(time.Duration(plan.IntervalSeconds) * time.Second)
-		if updateErr := s.dcaRepo.UpdatePlanNextRun(ctx, plan.ID, nextRun); updateErr != nil {
-			log.Printf("❌ [DCA] Failed to update next run for Plan #%d: %v", plan.ID, updateErr)
+
+		log.Printf("✅ [DCA] Plan #%d executed successfully (TxID: %s)", plan.ID, res.TransactionID)
+		plan.NextRunAt = time.Now().Add(time.Duration(plan.IntervalSeconds) * time.Second)
+		if updateErr := s.dcaRepo.UpdatePlanSuccess(ctx, plan); updateErr != nil {
+			log.Printf("❌ [DCA] Failed to update success plan: %v", updateErr)
 		}
 	}
 
