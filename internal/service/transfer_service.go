@@ -53,6 +53,7 @@ func (s *TransferService) ExecuteTransfer(ctx context.Context, req dto.TransferR
 	}
 	defer tx.Rollback()
 
+	// dead lock
 	firstLockID, secondLockID := req.FromAccountID, req.ToAccountID
 	if req.FromAccountID > req.ToAccountID {
 		firstLockID, secondLockID = req.FromAccountID, req.ToAccountID
@@ -93,6 +94,7 @@ func (s *TransferService) ExecuteTransfer(ctx context.Context, req dto.TransferR
 		AccountID:     req.FromAccountID,
 		Amount:        -req.Amount,
 	}
+	
 	if err := s.repo.CreateEntry(ctx, tx, creditEntry); err != nil {
 		return nil, err
 	}

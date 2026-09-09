@@ -18,7 +18,7 @@ func NewDCARepository(db *sql.DB) interfaces.DCARepository {
 
 func (r *dcaRepository) CreatePlan(ctx context.Context, plan *entity.DCAPlan) error {
 	query := `
-	INSEART INTO dca_plans (user_id, source_account_id, target_account_id, amount, interval_seconds, status, next_run_at) 
+	INSERT INTO dca_plans (user_id, source_account_id, target_account_id, amount, interval_seconds, status, next_run_at) 
 	VALUES ($1, $2, $3, $4, $5, $6, $7)
 	RETURNING id, created_at
 	`
@@ -55,7 +55,7 @@ func (r *dcaRepository) GetDuePlans(ctx context.Context, limit int) ([]*entity.D
 }
 
 func (r *dcaRepository) UpdatePlanNextRun(ctx context.Context, planID int, nextRun time.Time) error {
-	query := `UPDATE dca_plans SET last_run_at = NOW() next_run_at = &1 WHERE id = &2`
+	query := `UPDATE dca_plans SET last_run_at = NOW(), next_run_at = $1 WHERE id = $2`
 	_, err := r.db.ExecContext(ctx, query, nextRun, planID)
 	if err != nil {
 		return err

@@ -14,10 +14,10 @@ import (
 
 type dcaService struct {
 	dcaRepo         interfaces.DCARepository
-	transferService TransferService
+	transferService interfaces.TransferService
 }
 
-func NewDCAService(dcaRepo interfaces.DCARepository, transferService TransferService) interfaces.DCAService {
+func NewDCAService(dcaRepo interfaces.DCARepository, transferService interfaces.TransferService) interfaces.DCAService {
 	return &dcaService{
 		dcaRepo:         dcaRepo,
 		transferService: transferService,
@@ -81,7 +81,7 @@ func (s *dcaService) ProcessDuePlans(ctx context.Context) error {
 			log.Printf("✅ [DCA] Plan #%d executed successfully (TxID: %s)", plan.ID, res.TransactionID)
 		}
 		nextRun := time.Now().Add(time.Duration(plan.IntervalSeconds) * time.Second)
-		if updateErr := s.dcaRepo.UpdatePlanNextRun(ctx, plan.ID, nextRun); err != nil {
+		if updateErr := s.dcaRepo.UpdatePlanNextRun(ctx, plan.ID, nextRun); updateErr != nil {
 			log.Printf("❌ [DCA] Failed to update next run for Plan #%d: %v", plan.ID, updateErr)
 		}
 	}
